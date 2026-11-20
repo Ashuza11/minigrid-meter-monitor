@@ -22,6 +22,22 @@ traceable. Facts quoted here come from `explore.py` runs, not assumptions.
 | Missing = no row | **Missing = no row OR a reconstructed value** (`imputation_method` is `profile` or `uniform`) | The "clean" files fill communication gaps with estimates. Counting estimates as real data would report Ekong Anaku as complete when only 17% of its rows are observed. |
 | Timezone: assumed local, DST edge cases | **Timestamps are UTC**; local time = UTC + site offset (Kenya +3, Nigeria +1); neither country uses DST | Evidence: the evening peak appears at 16:00 stored time in Kenya, i.e. 19:00 local. DST tests are kept so the code stays correct for other regions. |
 
+### Data quality: two completeness figures (added after the first clean run)
+
+The brief defines completeness as observed slots / all slots in the window. The first run showed that missing
+data comes in long per-meter stretches (median longest gap 8 days at Lomekwi, up to 139 days), often because a
+meter starts reporting after the window begins or stops before it ends. So the report has both:
+
+- `completeness_pct`: observed slots / all slots in the window (the brief's definition, used for the 90% target).
+- `completeness_active_pct`: observed slots / slots between the meter's first and last reading. This separates
+  meter lifecycle (connected late, disconnected early) from unreliable reporting while in service.
+
+### Local time and the window edges
+
+Readings are selected by a UTC window, but days and months are reported in local time (what customers and
+the company use). So each site's local series starts a few hours after local midnight on 1 January and runs a
+few hours into 1 July (Kenya: 3 h, Nigeria: 1 h). Aggregation drops those partial local days at the edges.
+
 ## 3. Tariff and accounting
 
 | Original spec | Now | Why |

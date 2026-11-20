@@ -8,6 +8,11 @@ What it does:
   3. Give each meter a short readable ID (e.g. LOM-001) and keep a lookup table
      to the original pseudonymised code (needed to join payments).
   4. Save to raw/: readings, meters, sites, tariffs, payments.
+  5. For the energy balance (generation.py), also save:
+     - site_meter_totals: ALL meters of each site summed per 15-minute slot
+       (the sample of 50 is not the whole site, so it can't be compared with
+       what the site's solar system delivered);
+     - generation: the site's solar/inverter monitoring (Victron VRM) power columns.
 
 The raw/ files are a faithful subset of the source: no cleaning happens here.
 Cleaning is clean.py's job, so we can always compare "before" and "after".
@@ -45,6 +50,45 @@ def load_site_readings(site: str, file_stem: str) -> pd.DataFrame:
     df["site"] = site
     log.info("%s: %s rows, %d meters in window", site, f"{len(df):,}", df["meter_customer_code"].nunique())
     return df
+
+
+def site_meter_totals(site_df: pd.DataFrame, site: str) -> pd.DataFrame:
+    """Total energy of ALL meters at a site per 15-minute slot, before sampling.
+
+    energy_kwh includes reconstructed values (like the revenue figures);
+    energy_kwh_observed counts only what meters actually reported.
+    """
+    observed = site_df["imputation_method"] == config.OBSERVED_LABEL
+    df = site_df.assign(energy_kwh_observed=site_df["energy_kwh"].where(observed))
+    totals = df.groupby("slot_start").agg(
+        energy_kwh=("energy_kwh", "sum"),
+        energy_kwh_observed=("energy_kwh_observed", "sum"),
+        meters=("meter_customer_code", "nunique"),
+    ).reset_index()
+    totals.insert(0, "site", site)
+    return totals
+
+
+def load_generation() -> pd.DataFrame:
+    """Solar-system monitoring (Victron VRM) for our sites, power columns only.
+
+    VRM rows are instantaneous POWER readings in watts at irregular times, and
+    timestamp_local is LOCAL time (unlike meter readings, which are UTC).
+    One extra day on each side is kept so generation.py can cut exact local days.
+    """
+    path = config.SOURCE_DIR / "vrmgeneration.parquet"
+    start = config.WINDOW_START - pd.Timedelta(days=1)
+    end = config.WINDOW_END + pd.Timedelta(days=1)
+    df = pd.read_parquet(path, filters=[("Project_Name", "in", list(config.SITES)),
+                                        ("timestamp_local", ">=", start), ("timestamp_local", "<", end)])
+    keep = [c for c in df.columns
+            if c.endswith("_PV_power")                              # each solar charger's PV input
+            or c.startswith("System_overview_AC_Consumption")       # power delivered to the village
+            or c.startswith("System_overview_Genset")               # diesel generator, if any
+            or c == "System_overview_Battery_SOC"]                  # battery state of charge (%)
+    df = df[["Project_Name", "timestamp_local", *keep]].dropna(axis="columns", how="all")
+    log.info("generation: %s rows, %d power columns", f"{len(df):,}", len(keep))
+    return df.rename(columns={"Project_Name": "site"})
 
 
 def choose_meters(codes: pd.Series, n: int, seed: int) -> list[str]:
@@ -121,9 +165,10 @@ def load_payments(meters: pd.DataFrame) -> pd.DataFrame:
 
 def run(local: bool) -> None:
     """Build the raw subset and save it (locally, and to S3 unless local)."""
-    chosen_parts = []
+    chosen_parts, totals_parts = [], []
     for i, (site, file_stem) in enumerate(config.SITES.items()):
         site_df = load_site_readings(site, file_stem)
+        totals_parts.append(site_meter_totals(site_df, site))
         # seed + i: each site gets its own (still fixed) random draw.
         chosen = choose_meters(site_df["meter_customer_code"], config.METERS_PER_SITE, config.RANDOM_SEED + i)
         site_df = site_df[site_df["meter_customer_code"].isin(chosen)]
@@ -142,6 +187,9 @@ def run(local: bool) -> None:
     storage.write_csv(load_sites(), config.RAW_PREFIX, "sites.csv", local)
     storage.write_csv(load_tariffs(), config.RAW_PREFIX, "tariffs.csv", local)
     storage.write_csv(load_payments(meters), config.RAW_PREFIX, "payments.csv", local)
+    storage.write_csv(pd.concat(totals_parts, ignore_index=True), config.RAW_PREFIX,
+                      "site_meter_totals.csv.gz", local)
+    storage.write_csv(load_generation(), config.RAW_PREFIX, "generation.csv.gz", local)
     log.info("ingest done: %d meters, %s readings", len(meters), f"{len(readings):,}")
 
 

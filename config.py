@@ -63,6 +63,9 @@ OBSERVED_LABEL = "observed"
 
 # A meter below this share of observed intervals is reported as low quality.
 COMPLETENESS_TARGET = 0.90
+# A day enters the energy balance only if solar monitoring covers at least 90% of its
+# 15-minute slots: a day with hours missing would understate generation.
+GENERATION_MIN_COVERAGE = 0.90
 
 # ---------------------------------------------------------------------------
 # Anomaly rule thresholds (from the original brief)

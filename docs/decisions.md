@@ -78,7 +78,9 @@ Added because the new dataset supports them and they are standard mini-grid KPIs
 - **ARPU** (average revenue per user per month) and **kWh per customer per month**.
 - **Hourly load profile in local time** per site (Trends sheet).
 - **Observed vs reconstructed share** per meter and site (data-quality report).
-- **Energy sold per kWp of installed PV** per site and month, from `minigridprojects.parquet` (`sizePv`).
+- ~~Energy sold per kWp of installed PV~~: **moved to the generation step.** The sample holds 50 meters per site,
+  not every customer, so "sample kWh / site kWp" would understate the real figure. PV yield per kWp will come
+  from `vrmgeneration` (whole-site generation) instead.
 
 Added after downloading `paymentconfirmations`, `sparkmetertransactions` and `vrmgeneration` (2026-11-20):
 - **Billed vs collected**: estimated billed revenue (kWh × tariff) compared with payments actually received, per site and month.
@@ -101,4 +103,54 @@ Added after downloading `paymentconfirmations`, `sparkmetertransactions` and `vr
   against faults that this sample happens not to contain.
 - Ekong Anaku has most GAP events because ~70% of its data is reconstructed, leaving short islands of real
   readings between gaps; its SPIKE and ZERO_RUN counts are therefore not comparable with the Kenyan sites.
-- Exchange-rate source and values: added in the aggregation step.
+- Exchange-rate source and values: see section 8.
+
+## 8. Aggregation (2024 H1)
+
+### Exchange rates (the only external input)
+
+`reference/usd_exchange_rates_2024h1.csv` holds one rate per currency and month, with its source:
+
+| Month | KES per USD | NGN per USD |
+|---|---|---|
+| 2024-01 | 159.69 | 941.26 |
+| 2024-02 | 151.84 | 1,506.84 |
+| 2024-03 | 137.35 | 1,510.84 |
+| 2024-04 | 131.57 | 1,236.56 |
+| 2024-05 | 131.69 | 1,435.57 |
+| 2024-06 | 129.36 | 1,481.77 |
+
+- **KES**: Central Bank of Kenya, *Monthly Exchange rate (period average)*, column "United States dollar"
+  (https://www.centralbank.go.ke/statistics/exchange-rates/). Cross-check: the CBK Quarterly Economic Reviews
+  give averages of 149.63 for Q1 and 130.87 for Q2 2024, which equal the means of these monthly values.
+- **NGN**: Central Bank of Nigeria publishes daily rates, not monthly averages
+  (https://www.cbn.gov.ng/rates/ExchRateByCurrency.html). The value is the mean of the daily US DOLLAR
+  `centralrate` for each month (17–22 business days). 2024-02-22 has two entries, which were averaged.
+- Why monthly averages: revenue accrues across the month, and the naira lost ~40% in H1 2024 (official
+  rate ~900 in early January, ~1,500 by June). One rate for the whole period would distort the USD trend.
+- Retrieved 2026-11-20.
+
+### Pricing choices
+
+| Choice | Why |
+|---|---|
+| Price = `totalRate` (VAT included); net = `totalRate / (1 + vatRate)` | For Ekong Anaku, `baseRate x (1 + vatRate)` = 299.93 does not equal `totalRate` = 399.79. The data supports `totalRate` (next row), so the net amount is derived from it rather than read from `baseRate`. |
+| Billed revenue = daily kWh (observed + reconstructed) x the tariff in force that day (`merge_asof`) | Over H1, payments collected equal **99.6%** (Ekong Anaku), **102.9%** (Lomekwi) and **96.2%** (Lorengelup) of this billed estimate. With observed kWh only, Ekong Anaku billing would cover ~61% of what customers paid, so reconstructed energy is real, sold energy. |
+| Partial local days dropped | Period reported: 2 Jan – 30 Jun 2024 (181 full local days per meter). Payments are filtered to the same local days. |
+| "Customer with use" = meter with kWh > 0 in the month | Denominator for ARPU and kWh per customer, so meters that were idle all month don't dilute the averages. |
+
+### Headline results (sample of 50 meters per site)
+
+| Site | kWh (H1) | Observed share of kWh | Billed | Collected | Collected / billed |
+|---|---|---|---|---|---|
+| Ekong Anaku | 1,472.9 | 61.1% | NGN 588,851 (USD 449) | NGN 586,762 (USD 446) | 99.6% |
+| Lomekwi | 1,625.6 | 87.6% | KES 96,173 (USD 692) | KES 99,003 (USD 712) | 102.9% |
+| Lorengelup | 672.7 | 99.0% | KES 33,554 (USD 238) | KES 32,268 (USD 230) | 96.2% |
+
+- Monthly ARPU: Lomekwi USD 2.15–3.26, Ekong Anaku USD 0.94–2.18, Lorengelup USD 0.77–1.01.
+- Ekong Anaku's USD revenue halves from January to February while its naira revenue falls only 16%: most of
+  the USD drop is the currency, not the customers. This is why both currencies are shown.
+- Peak local hour: 19:00 at Lomekwi, 20:00 at Ekong Anaku, but **10:00 at Lorengelup**, where commercial
+  customers (9 of 50) use more energy than the 40 residential ones in every month.
+- Observed share of kWh (61% at Ekong Anaku) is much higher than its slot completeness (median 8%): the meters
+  that do report are the larger consumers.

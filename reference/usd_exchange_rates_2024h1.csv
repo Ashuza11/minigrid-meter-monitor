@@ -1,0 +1,13 @@
+month,currency,local_per_usd,days_averaged,source,source_url
+2024-01,KES,159.69,,"Central Bank of Kenya, Monthly Exchange rate (period average)",https://www.centralbank.go.ke/statistics/exchange-rates/
+2024-02,KES,151.84,,"Central Bank of Kenya, Monthly Exchange rate (period average)",https://www.centralbank.go.ke/statistics/exchange-rates/
+2024-03,KES,137.35,,"Central Bank of Kenya, Monthly Exchange rate (period average)",https://www.centralbank.go.ke/statistics/exchange-rates/
+2024-04,KES,131.57,,"Central Bank of Kenya, Monthly Exchange rate (period average)",https://www.centralbank.go.ke/statistics/exchange-rates/
+2024-05,KES,131.69,,"Central Bank of Kenya, Monthly Exchange rate (period average)",https://www.centralbank.go.ke/statistics/exchange-rates/
+2024-06,KES,129.36,,"Central Bank of Kenya, Monthly Exchange rate (period average)",https://www.centralbank.go.ke/statistics/exchange-rates/
+2024-01,NGN,941.26,22,"Central Bank of Nigeria, daily official (NFEM) US DOLLAR central rate, averaged per month",https://www.cbn.gov.ng/rates/ExchRateByCurrency.html
+2024-02,NGN,1506.84,20,"Central Bank of Nigeria, daily official (NFEM) US DOLLAR central rate, averaged per month",https://www.cbn.gov.ng/rates/ExchRateByCurrency.html
+2024-03,NGN,1510.84,20,"Central Bank of Nigeria, daily official (NFEM) US DOLLAR central rate, averaged per month",https://www.cbn.gov.ng/rates/ExchRateByCurrency.html
+2024-04,NGN,1236.56,18,"Central Bank of Nigeria, daily official (NFEM) US DOLLAR central rate, averaged per month",https://www.cbn.gov.ng/rates/ExchRateByCurrency.html
+2024-05,NGN,1435.57,22,"Central Bank of Nigeria, daily official (NFEM) US DOLLAR central rate, averaged per month",https://www.cbn.gov.ng/rates/ExchRateByCurrency.html
+2024-06,NGN,1481.77,17,"Central Bank of Nigeria, daily official (NFEM) US DOLLAR central rate, averaged per month",https://www.cbn.gov.ng/rates/ExchRateByCurrency.html

@@ -28,6 +28,10 @@ LOCAL_ROOT = Path("data")                   # with --local, raw/ and processed/ 
 RAW_PREFIX = "raw"                          # same folder names locally and on S3
 PROCESSED_PREFIX = "processed"
 
+# Official monthly USD exchange rates (Central Bank of Kenya, Central Bank of Nigeria).
+# Small, cited and committed to git: see the source columns in the file.
+FX_RATES_FILE = Path("reference/usd_exchange_rates_2024h1.csv")
+
 # ---------------------------------------------------------------------------
 # Which data we use
 # ---------------------------------------------------------------------------

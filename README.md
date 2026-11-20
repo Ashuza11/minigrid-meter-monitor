@@ -3,7 +3,20 @@
 A smart-meter data pipeline and dashboard for community solar mini-grids:
 ingest → clean → rule-based anomaly detection → aggregation and revenue accounting → AWS S3 → QuickSight / Power BI.
 
+![MiniGrid Meter Monitor pipeline architecture](docs/images/pipeline_architecture.png)
+
 > Work in progress: this README will be completed with real results from pipeline runs.
+
+## How to run
+
+```bash
+uv run python run_pipeline.py --local                # full pipeline, local files only
+uv run python run_pipeline.py --local --skip-ingest  # reuse data/raw/ (no source files needed)
+uv run pytest -q                                     # 64 tests
+```
+
+Design decisions and every deviation from the original spec: [`docs/decisions.md`](docs/decisions.md).
+Plain-language guide to the data and metrics: [`docs/data_and_metrics.md`](docs/data_and_metrics.md).
 
 ## Setup
 

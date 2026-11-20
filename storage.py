@@ -60,6 +60,17 @@ def write_csv(df: pd.DataFrame, folder: str, filename: str, local: bool) -> Path
     return path
 
 
+def write_text(text: str, folder: str, filename: str, local: bool) -> Path:
+    """Write a text file (e.g. a markdown summary) the same way as write_csv."""
+    path = local_path(folder, filename)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    log.info("wrote %s", path)
+    if not local:
+        upload(path, f"{folder}/{filename}")
+    return path
+
+
 def read_csv(folder: str, filename: str, local: bool, **kwargs) -> pd.DataFrame:
     """Read data/<folder>/<filename>; without --local, download it from S3 first.
 

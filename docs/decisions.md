@@ -41,6 +41,8 @@ Thresholds stay as specified. Severity cut-offs approved on 2026-11-20:
 | NEGATIVE | value < 0 | — | — | always |
 | FLATLINE | same non-zero value ≥ 12 h | 12–24 h | 24–48 h | > 48 h |
 
+Boundary convention: **upper limits are inclusive** (exactly 24 h is still "low", exactly 72 h is "medium"), so ">72 h" and ">20×" read exactly as in the table. One consistency consequence: ZERO_RUN is "medium" up to and including 7.0 days and "high" above 7 days (the table originally said "7+ days").
+
 Adjustments driven by the data:
 - **SPIKE minimum baseline** will be calibrated on real data, because most 15-min readings are 0 (median 0 kWh), so a raw median baseline would flag every non-zero reading.
 - **ZERO_RUN is interpreted as "no consumption"**, not "faulty meter": on a prepaid mini-grid it most often means the customer has no credit.
@@ -55,10 +57,15 @@ Added because the new dataset supports them and they are standard mini-grid KPIs
 - **Observed vs reconstructed share** per meter and site (data-quality report).
 - **Energy sold per kWp of installed PV** per site and month, from `minigridprojects.parquet` (`sizePv`).
 
-Pending user decision (needs extra downloads): see section 6.
+Added after downloading `paymentconfirmations`, `sparkmetertransactions` and `vrmgeneration` (2026-11-20):
+- **Billed vs collected**: estimated billed revenue (kWh × tariff) compared with payments actually received, per site and month.
+  - Source: `paymentconfirmations.parquet`. Its `customerAccountNumber` is the same pseudonymised ID as `meter_customer_code` in the readings. In Jan–Jun 2024, every payer at Lomekwi (61) and Lorengelup (43), and 185 of 188 at Ekong Anaku, matched a meter in the readings.
+  - Not used: `sparkmetertransactions.parquet`. It is the metering platform's internal ledger: in the window roughly half its rows are `pending` and half `processed`, which suggests one transaction can appear more than once. Using it would risk double counting.
+- **ZERO_RUN context**: whether a zero-consumption run ends shortly after a payment (points to a credit problem rather than a fault).
+- **Generated vs sold** (to be explored): `vrmgeneration.parquet` has rows for all three sites in the window. Its columns are per-device (PV inverters, battery monitor) and its timestamp is **local time** (`timestamp_local`), unlike the UTC meter readings.
 
 ## 6. Open items
 
-- Payments reconciliation (billed vs collected) and generation vs energy sold: need extra files from Zenodo.
+- Which `vrmgeneration` columns give PV energy for each site: decided when that step starts.
 - Exact SPIKE minimum baseline: set in the anomalies step from real data.
 - Exchange-rate source and values: added in the aggregation step.

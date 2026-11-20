@@ -67,7 +67,10 @@ GAP_MIN_HOURS = 6              # 6 h without observed data: longer than normal n
 ZERO_RUN_MIN_DAYS = 3          # 3 full days at zero: household not using power / no credit
 SPIKE_FACTOR = 5               # reading > 5x its recent typical level
 SPIKE_BASELINE_DAYS = 7        # "recent" = the previous 7 days (covers a full weekly cycle)
-SPIKE_MIN_BASELINE_KWH = None  # set in the anomalies step after looking at real values
+# Calibrated on observed 2024 H1 data (docs/decisions.md): 75% of readings are 0, so the
+# baseline is the median of NON-ZERO readings ("typical level when the meter is in use").
+SPIKE_MIN_BASELINE_KWH = 0.001     # 0.001 kWh per 15 min = 4 W average; smaller baselines are noise
+SPIKE_MIN_HISTORY_READINGS = 24    # need >= 24 non-zero readings (6 h of use) in the 7 days before
 FLATLINE_MIN_HOURS = 12        # a real household's use changes within 12 h; a stuck value doesn't
 
 # ---------------------------------------------------------------------------

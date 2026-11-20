@@ -60,8 +60,15 @@ Thresholds stay as specified. Severity cut-offs approved on 2026-11-20:
 Boundary convention: **upper limits are inclusive** (exactly 24 h is still "low", exactly 72 h is "medium"), so ">72 h" and ">20×" read exactly as in the table. One consistency consequence: ZERO_RUN is "medium" up to and including 7.0 days and "high" above 7 days (the table originally said "7+ days").
 
 Adjustments driven by the data:
-- **SPIKE minimum baseline** will be calibrated on real data, because most 15-min readings are 0 (median 0 kWh), so a raw median baseline would flag every non-zero reading.
-- **ZERO_RUN is interpreted as "no consumption"**, not "faulty meter": on a prepaid mini-grid it most often means the customer has no credit.
+- **SPIKE baseline changed** (calibrated on 1,423,360 observed readings, 2024 H1): 75% of observed readings are 0,
+  so the plain 7-day median was 0 for 83.5% of slots and "5 × 0" would flag any usage at all. The baseline is now
+  the **median of the previous 7 days' non-zero readings** (typical level when the meter is in use), with a
+  **minimum of 0.001 kWh per 15 min** (4 W; about the 25th percentile of non-zero readings) and at least
+  **24 non-zero readings of history**. Consecutive spiking slots are merged into one event.
+- **ZERO_RUN means "no consumption"**, not "faulty meter". The first idea was "customer out of credit", but the
+  payments data does not support it: only 13 of 184 zero runs that ended with usage resuming had a payment within
+  a week. Either top-ups also happen through channels missing from `paymentconfirmations` (it contains only mobile
+  money: M-Pesa, Paga), or the household simply wasn't using power. Reported as an open question, not a conclusion.
 - **Rules run on observed values only**; reconstructed values are excluded so the rules don't flag estimates.
 
 ## 5. Additions beyond the original spec
@@ -83,5 +90,15 @@ Added after downloading `paymentconfirmations`, `sparkmetertransactions` and `vr
 ## 6. Open items
 
 - Which `vrmgeneration` columns give PV energy for each site: decided when that step starts.
-- Exact SPIKE minimum baseline: set in the anomalies step from real data.
+- Payments cover mobile money only, so "billed vs collected" may understate collections (cash top-ups unknown).
+- GAP also catches meter lifecycle: a meter first seen in April gets a GAP from 1 January. Kept, because the
+  "while active" completeness figure already separates the two in the data-quality report.
+
+## 7. First anomaly run (2024 H1, 150 meters)
+
+- NEGATIVE and FLATLINE found **0** events. Checked directly: there are 0 negative observed values, and the
+  longest identical non-zero run is 15 slots (3.75 h), below the 12 h threshold. Both rules stay: they guard
+  against faults that this sample happens not to contain.
+- Ekong Anaku has most GAP events because ~70% of its data is reconstructed, leaving short islands of real
+  readings between gaps; its SPIKE and ZERO_RUN counts are therefore not comparable with the Kenyan sites.
 - Exchange-rate source and values: added in the aggregation step.

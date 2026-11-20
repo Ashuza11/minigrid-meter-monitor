@@ -209,3 +209,16 @@ local time, and the conversion is correct.
 - At Ekong Anaku, meter totals are above delivered power at night. Its meter data is only 60% observed, and the
   reconstructed values are estimates, so its hourly shape is approximate. Monthly totals are
   still consistent (84%).
+
+## 10. Pipeline runner and QuickSight manifests
+
+- `run_pipeline.py` runs ingest, clean, anomalies, aggregate, generation and manifest in order. It writes
+  each run's log to `logs/` (git-ignored) and stops at the first failing step with a non-zero exit code, so a
+  scheduler never publishes tables built from stale inputs. `--skip-ingest` reuses `raw/`.
+- Reproducibility check: a full run rebuilt every file in `processed/` byte-for-byte identical (md5) to the
+  previous run.
+- **One manifest per table** instead of one for the whole dataset. The AWS QuickSight docs (*Supported formats
+  for Amazon S3 manifest files*) require all files in a manifest to have the same columns, and each of our
+  tables has different columns. Seven tables are published: `monthly_site`, `energy_balance_monthly`,
+  `daily_meter`, `load_profile`, `anomalies`, `data_quality_report`, `accounting`.
+- Dashboard tables are plain `.csv`: the manifest docs don't list gzip-compressed CSV as a supported format.

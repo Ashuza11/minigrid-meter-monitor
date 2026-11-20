@@ -78,20 +78,22 @@ Added because the new dataset supports them and they are standard mini-grid KPIs
 - **ARPU** (average revenue per user per month) and **kWh per customer per month**.
 - **Hourly load profile in local time** per site (Trends sheet).
 - **Observed vs reconstructed share** per meter and site (data-quality report).
-- ~~Energy sold per kWp of installed PV~~: **moved to the generation step.** The sample holds 50 meters per site,
-  not every customer, so "sample kWh / site kWp" would understate the real figure. PV yield per kWp will come
-  from `vrmgeneration` (whole-site generation) instead.
+- ~~Energy sold per kWp of installed PV~~: **replaced by PV yield per kWp** (solar energy produced per kW of
+  panels per day) from `vrmgeneration`. The sample holds 50 meters per site, not every customer, so
+  "sample kWh / site kWp" would understate the real figure. See section 9.
 
 Added after downloading `paymentconfirmations`, `sparkmetertransactions` and `vrmgeneration` (2026-11-20):
 - **Billed vs collected**: estimated billed revenue (kWh × tariff) compared with payments actually received, per site and month.
   - Source: `paymentconfirmations.parquet`. Its `customerAccountNumber` is the same pseudonymised ID as `meter_customer_code` in the readings. In Jan–Jun 2024, every payer at Lomekwi (61) and Lorengelup (43), and 185 of 188 at Ekong Anaku, matched a meter in the readings.
   - Not used: `sparkmetertransactions.parquet`. It is the metering platform's internal ledger: in the window roughly half its rows are `pending` and half `processed`, which suggests one transaction can appear more than once. Using it would risk double counting.
 - **ZERO_RUN context**: whether a zero-consumption run ends shortly after a payment (points to a credit problem rather than a fault).
-- **Generated vs sold** (to be explored): `vrmgeneration.parquet` has rows for all three sites in the window. Its columns are per-device (PV inverters, battery monitor) and its timestamp is **local time** (`timestamp_local`), unlike the UTC meter readings.
+- **Generated vs delivered vs metered** (done, section 9): `vrmgeneration.parquet` has rows for all three sites in the window. Its columns are per-device (PV inverters, battery monitor) and its timestamp is **local time** (`timestamp_local`), unlike the UTC meter readings.
 
 ## 6. Open items
 
-- Which `vrmgeneration` columns give PV energy for each site: decided when that step starts.
+- ~~Which `vrmgeneration` columns give PV energy~~: decided, section 9.
+- Lorengelup meters only 39% of the energy its system delivers (section 9). The cause can't be determined
+  from the data; it needs a site visit or the operator's network records.
 - Payments cover mobile money only, so "billed vs collected" may understate collections (cash top-ups unknown).
 - GAP also catches meter lifecycle: a meter first seen in April gets a GAP from 1 January. Kept, because the
   "while active" completeness figure already separates the two in the data-quality report.
@@ -154,3 +156,56 @@ Added after downloading `paymentconfirmations`, `sparkmetertransactions` and `vr
   customers (9 of 50) use more energy than the 40 residential ones in every month.
 - Observed share of kWh (61% at Ekong Anaku) is much higher than its slot completeness (median 8%): the meters
   that do report are the larger consumers.
+
+## 9. Energy balance (generation step)
+
+### What the monitoring data is
+
+`vrmgeneration.parquet` is the Victron VRM remote monitoring of each site's power system. Its rows are
+**instantaneous power in watts** (not energy), recorded at irregular times: mostly every 15 minutes, with bursts
+of rows seconds apart. Timestamps are local time.
+
+| Quantity | Columns used | Note |
+|---|---|---|
+| Solar produced (`pv_kwh`) | sum of every `Solar_Charger_*_PV_power` | DC-coupled chargers. Our sites have no `PV_Inverter_*` data. |
+| Delivered to the village (`load_kwh`) | sum of `System_overview_AC_Consumption_L1..L3` | AC output of the inverters, before the village network. |
+| Diesel generator (`genset_kwh`) | sum of `System_overview_Genset_L1..L3` | Recorded only while running, so empty = 0 W. |
+| Battery charge (`battery_soc_pct`) | `System_overview_Battery_SOC` | Context for solar yield. |
+
+### Method
+
+| Choice | Why |
+|---|---|
+| Power to energy: mean watts in each 15-minute slot x 0.25 h / 1000 | Matches the meter interval. Averaging handles bursts (many rows in one slot) without over-weighting them. |
+| Meter side = **all** meters at the site, summed per slot in `ingest.py` | Our 50-meter sample is 77% of Lomekwi's meters, 81% of Lorengelup's and about 26% of Ekong Anaku's (up to 195 meters), so it can't be compared with whole-site generation. |
+| Compare only slots where solar AND delivered power were monitored; meter totals summed over the same slots | Like-for-like totals: a monitoring gap doesn't make the meters look larger than the delivered energy. |
+| A day is included if at least 90% of its slots are monitored (`GENERATION_MIN_COVERAGE`) | Included days: Lomekwi 157 / 181, Lorengelup 154 / 181, Ekong Anaku 109 / 181. |
+| PV yield per kWp per day = pv_kwh / pv_kwp / monitored days | "Monitored days" = monitored slots / 96, so partly monitored days count in proportion. |
+
+**Time-alignment check.** Correlation between delivered power and meter totals is highest with no time shift
+at all three sites (shifts of -2 h to +2 h tested). That confirms that meter readings are UTC, the monitoring is
+local time, and the conversion is correct.
+
+### Results (2 Jan – 30 Jun 2024, included days)
+
+| Site | Solar produced | Delivered | Metered (all meters) | Metered / delivered | PV yield (kWh/kWp/day) | Avg battery charge |
+|---|---|---|---|---|---|---|
+| Ekong Anaku | 4,239 kWh | 3,519 kWh | 2,963 kWh | **84.2%** | 3.19 | 46% |
+| Lomekwi | 2,958 kWh | 2,190 kWh | 1,640 kWh | **74.9%** | 0.84 | 92% |
+| Lorengelup | 2,368 kWh | 1,627 kWh | 640 kWh | **39.3%** | 1.60 | 90% |
+
+- **Delivered vs produced** (69–83%) covers battery charge and discharge losses, inverter losses, and the
+  system's own consumption.
+- **Metered vs delivered** is the distribution figure: line losses, unmetered loads, theft and meter faults.
+  Ekong Anaku and Lomekwi are in a plausible range for small networks. **Lorengelup is an outlier.** Its meter
+  data is 99% observed, so this is not a data gap. The unmetered power is present at every hour (about 150 W
+  during the day and 330–400 W at night), which points to a constant or night-time unmetered load, such as
+  street or security lighting, rather than to customer behaviour. This is a hypothesis to verify on site.
+- **Low PV yield in Kenya is a demand issue, not a solar issue.** Lomekwi produces 0.84 kWh per kWp per day
+  with its battery at 92% on average: the battery is usually full and demand is low, so the chargers limit
+  solar input. Ekong Anaku, with higher demand, reaches 3.19 with the battery at 46%. Lomekwi has spare
+  capacity for new customers or productive-use loads.
+- Ekong Anaku used its diesel generator in March only (97 kWh), the one month where solar fell short of demand.
+- At Ekong Anaku, meter totals are above delivered power at night. Its meter data is only 60% observed, and the
+  reconstructed values are estimates, so its hourly shape is approximate. Monthly totals are
+  still consistent (84%).

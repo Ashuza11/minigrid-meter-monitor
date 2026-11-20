@@ -26,7 +26,7 @@ Each customer's **smart meter** records how much electricity passes through it. 
 | Customers | 50 per site, selected at random with a fixed seed so the selection is reproducible (150 in total) |
 | Period | 1 January – 30 June 2024 |
 | Resolution | One reading per meter every 15 minutes (96 readings per day) |
-| Supporting tables | Site details (PV and battery size), tariffs, mobile-money payments |
+| Supporting tables | Site details (PV and battery size), tariffs, mobile-money payments, power-system monitoring (solar production, energy delivered, battery charge) |
 
 **Consumption profile.** Customers use small amounts of energy, mostly for lighting, phone charging and small
 appliances. About three quarters of all 15-minute readings are zero. Demand peaks in the evening at the
@@ -40,6 +40,7 @@ residential sites, at 19:00 local time in Lomekwi and 20:00 in Ekong Anaku.
 | Clean | Validate the data and build a complete 15-minute timeline per meter, so missing periods become visible | Clean readings, data-quality report |
 | Anomalies | Apply five transparent rules that flag operational issues | Anomaly register |
 | Aggregate | Total energy and revenue per day, month, site and customer class, in local currency and USD | Daily, monthly and accounting tables |
+| Energy balance | Compare solar production, energy delivered to the village and energy recorded by all customer meters | Daily and monthly energy balance |
 | Dashboard | Present results in four views: Overview, Trends, Anomalies, Accounting | QuickSight or Power BI |
 
 ## 4. Data quality
@@ -140,7 +141,45 @@ rule; no machine-learning model is used.
    evening, because its 9 commercial customers use more energy than its 40 residential customers in every
    month.
 
-## 7. Exchange rates
+## 7. Energy balance
+
+Each site's power system is monitored remotely. Comparing that monitoring with the customer meters shows where
+energy goes between the solar panels and the customer.
+
+| Metric | Definition |
+|---|---|
+| **Solar produced** | Energy from the solar panels. |
+| **Delivered** | Energy the power system sent into the village network. |
+| **Metered** | Energy recorded by all customer meters at the site (not only the 50 sampled). |
+| **Metered / delivered** | Share of delivered energy that reaches a customer meter. The remainder is lost in the network or consumed without a meter: line losses, unmetered loads, theft or faulty meters. |
+| **PV yield** | Solar energy produced per kW of installed panels per day. It shows how much of the solar capacity is used. |
+
+Only days with at least 90% monitoring coverage are included, and meter totals are compared over exactly the
+same 15-minute periods as the monitoring.
+
+| Site | Solar produced | Delivered | Metered | Metered / delivered | PV yield (kWh/kWp/day) | Average battery charge |
+|---|---|---|---|---|---|---|
+| Ekong Anaku | 4,239 kWh | 3,519 kWh | 2,963 kWh | 84.2% | 3.19 | 46% |
+| Lomekwi | 2,958 kWh | 2,190 kWh | 1,640 kWh | 74.9% | 0.84 | 92% |
+| Lorengelup | 2,368 kWh | 1,627 kWh | 640 kWh | 39.3% | 1.60 | 90% |
+
+**Key findings**
+
+1. **Lorengelup does not meter most of its energy.** Only 39% of delivered energy reaches a customer meter.
+   Its meter data is 99% observed, so this is not a data gap. The unmetered energy is present at every hour of
+   the day and is higher at night, which points to a constant or night-time load without a meter, such as
+   street or security lighting. This should be verified on site. The unmetered energy (987 kWh) exceeds the
+   metered energy (640 kWh). If it can be metered and billed, the site's billable energy would more than double.
+2. **The Kenyan systems have spare solar capacity.** Lomekwi's panels produce 0.84 kWh per kW per day while its
+   battery is 92% charged on average. The battery is usually full and demand is low, so solar output is limited
+   by demand, not by sunshine. Ekong Anaku, with higher demand, produces 3.19 kWh per kW per day. Lomekwi could
+   serve more customers or productive uses (milling, cooling, irrigation) without new panels.
+3. **Diesel use is minimal.** Ekong Anaku ran its generator only in March (97 kWh), the one month in which
+   solar production fell short of demand.
+4. **The time conversion is verified.** Monitoring and meter data line up best with no time shift, which
+   confirms that the meters record universal time and that the conversion to local time is correct.
+
+## 8. Exchange rates
 
 | Month | KES per USD | NGN per USD |
 |---|---|---|
@@ -158,7 +197,7 @@ rule; no machine-learning model is used.
   (https://www.cbn.gov.ng/rates/ExchRateByCurrency.html), averaged over each month's business days.
 - Monthly averages are used because revenue accrues throughout the month.
 
-## 8. Key decisions
+## 9. Key decisions
 
 | Decision | Rationale |
 |---|---|
@@ -171,11 +210,15 @@ rule; no machine-learning model is used.
 | SPIKE compares against the customer's typical in-use level, not all readings | Three quarters of readings are zero, so a plain average or median would be zero and every use of electricity would count as a spike. |
 | Tariff taken as the VAT-inclusive price; net revenue derived from it | The Nigerian net price field is inconsistent with its VAT-inclusive price, and the payments data supports the VAT-inclusive figure. |
 | Payment context added to ZERO_RUN | Tests whether zero-consumption periods are caused by lack of credit. Only 13 of 184 such periods ended with a top-up within a week, so this explanation is not supported and remains an open question. |
-| Energy per installed kW of solar deferred to the generation analysis | Sample consumption divided by whole-site capacity would understate the real figure. |
+| Energy balance uses all meters at each site, not the sample | The sample covers 26% to 81% of each site's meters and cannot be compared with whole-site production. |
+| Only days with at least 90% monitoring coverage enter the energy balance | Days with large monitoring gaps would understate production and delivery. |
 
-## 9. Limitations
+## 10. Limitations
 
-- **Sample, not census.** Totals cover 50 customers per site, not each site's full customer base.
+- **Sample, not census.** Revenue and consumption totals cover 50 customers per site, not each site's full
+  customer base. The energy balance is the exception: it uses all meters.
+- **Monitoring is sampled power, not metered energy.** Energy is estimated from power readings averaged per
+  15 minutes, so it is an approximation.
 - **Ekong Anaku data quality.** Most of its readings are reconstructed, so its consumption detail and anomaly
   counts are less reliable than those of the Kenyan sites.
 - **Payments cover mobile money only.** Any cash top-ups are not included in collected revenue.

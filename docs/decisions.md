@@ -179,7 +179,7 @@ of rows seconds apart. Timestamps are local time.
 | Power to energy: mean watts in each 15-minute slot x 0.25 h / 1000 | Matches the meter interval. Averaging handles bursts (many rows in one slot) without over-weighting them. |
 | Meter side = **all** meters at the site, summed per slot in `ingest.py` | Our 50-meter sample is 77% of Lomekwi's meters, 81% of Lorengelup's and about 26% of Ekong Anaku's (up to 195 meters), so it can't be compared with whole-site generation. |
 | Compare only slots where solar AND delivered power were monitored; meter totals summed over the same slots | Like-for-like totals: a monitoring gap doesn't make the meters look larger than the delivered energy. |
-| A day is included if at least 90% of its slots are monitored (`GENERATION_MIN_COVERAGE`) | Included days: Lomekwi 157 / 181, Lorengelup 154 / 181, Ekong Anaku 109 / 181. |
+| A day is included if at least 90% of its slots are monitored (`GENERATION_MIN_COVERAGE`) | Included days: Lomekwi 157 / 181, Lorengelup 154 / 181, Ekong Anaku 108 / 181. |
 | PV yield per kWp per day = pv_kwh / pv_kwp / monitored days | "Monitored days" = monitored slots / 96, so partly monitored days count in proportion. |
 
 **Time-alignment check.** Correlation between delivered power and meter totals is highest with no time shift
@@ -222,3 +222,25 @@ local time, and the conversion is correct.
   tables has different columns. Seven tables are published: `monthly_site`, `energy_balance_monthly`,
   `daily_meter`, `load_profile`, `anomalies`, `data_quality_report`, `accounting`.
 - Dashboard tables are plain `.csv`: the manifest docs don't list gzip-compressed CSV as a supported format.
+
+## 11. AWS S3 deployment
+
+- **Dedicated bucket and least-privilege user.** The pipeline uses its own private bucket (Block all public
+  access on, default encryption) and an IAM user with no console access. Its inline policy
+  ([`docs/aws/iam_policy_pipeline.json`](aws/iam_policy_pipeline.json)) allows only `s3:ListBucket` on that
+  bucket and `s3:GetObject` / `s3:PutObject` on its objects. No delete, and no access to any other bucket in
+  the account (verified: listing all buckets returns `AccessDenied`). Credentials live in
+  `~/.aws/credentials`, outside the repository. `.env` only names the bucket, profile and region.
+- **Region: eu-central-1 (Frankfurt) instead of eu-west-1.** From the development connection, S3 in
+  eu-west-1 stopped answering (TCP connected, no TLS or HTTP reply), while other regions answered in about
+  1 s. The bucket was empty, so it was recreated in eu-central-1. QuickSight is available there too.
+- **Upload settings for a slow connection** (`storage.py`): 300 s read timeout instead of 60 s, up to 10
+  retries, and multipart uploads 2 parts at a time instead of 10. With 10 parallel parts, a slow uplink is
+  shared 10 ways and each part timed out.
+- **Lower memory in ingest.** The first S3 run was stopped by the Linux out-of-memory killer at 2.1 GB
+  (the WSL machine has 3.8 GB). `load_generation` read every column of the monitoring file before keeping
+  the power columns. It now reads the column names from the Parquet schema and loads only those. The
+  output is identical (175,033 rows, same values), and peak memory for the load is about 0.75 GB.
+- First full S3 run: 304.5 s, exit code 0. 27 files (40.6 MB) in the bucket: 7 raw, 13 processed, 7 manifests,
+  with the same energy-balance totals as the local runs.
+- Correction: section 9 had listed 109 included days for Ekong Anaku; every pipeline log shows 108. Fixed.

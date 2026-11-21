@@ -27,11 +27,27 @@ def _s3_client():
     without any AWS setup.
     """
     import boto3
+    from botocore.config import Config
 
     if not config.S3_BUCKET:
         raise RuntimeError("S3_BUCKET is not set. Create .env from .env.example, or use --local.")
     session = boto3.Session(profile_name=config.AWS_PROFILE, region_name=config.AWS_REGION)
-    return session.client("s3")
+    # Settings for a slow or unstable connection: wait up to 5 minutes for an
+    # answer (default 60 s) and retry a failed request up to 10 times.
+    slow_network = Config(connect_timeout=30, read_timeout=300,
+                          retries={"max_attempts": 10, "mode": "standard"})
+    return session.client("s3", config=slow_network)
+
+
+def _transfer_config():
+    """Upload big files in 8 MB parts, 2 at a time (default is 10 at a time).
+
+    With 10 parallel parts a slow upload link is shared 10 ways, so each part
+    is too slow and times out. 2 at a time gives each part enough bandwidth.
+    """
+    from boto3.s3.transfer import TransferConfig
+
+    return TransferConfig(multipart_chunksize=8 * 1024 * 1024, max_concurrency=2)
 
 
 def local_path(folder: str, filename: str) -> Path:
@@ -41,7 +57,7 @@ def local_path(folder: str, filename: str) -> Path:
 
 def upload(path: Path, key: str) -> None:
     """Upload one local file to s3://<bucket>/<key>."""
-    _s3_client().upload_file(str(path), config.S3_BUCKET, key)
+    _s3_client().upload_file(str(path), config.S3_BUCKET, key, Config=_transfer_config())
     log.info("uploaded s3://%s/%s", config.S3_BUCKET, key)
 
 

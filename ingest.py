@@ -25,6 +25,7 @@ import argparse
 import logging
 
 import pandas as pd
+import pyarrow.parquet as pq
 
 import config
 import storage
@@ -79,14 +80,18 @@ def load_generation() -> pd.DataFrame:
     path = config.SOURCE_DIR / "vrmgeneration.parquet"
     start = config.WINDOW_START - pd.Timedelta(days=1)
     end = config.WINDOW_END + pd.Timedelta(days=1)
-    df = pd.read_parquet(path, filters=[("Project_Name", "in", list(config.SITES)),
-                                        ("timestamp_local", ">=", start), ("timestamp_local", "<", end)])
-    keep = [c for c in df.columns
+    # Pick the columns from the file's schema (column list only, no data read),
+    # then load just those. Loading every column first used over 2 GB of RAM.
+    all_columns = pq.read_schema(path).names
+    keep = [c for c in all_columns
             if c.endswith("_PV_power")                              # each solar charger's PV input
             or c.startswith("System_overview_AC_Consumption")       # power delivered to the village
             or c.startswith("System_overview_Genset")               # diesel generator, if any
             or c == "System_overview_Battery_SOC"]                  # battery state of charge (%)
-    df = df[["Project_Name", "timestamp_local", *keep]].dropna(axis="columns", how="all")
+    df = pd.read_parquet(path, columns=["Project_Name", "timestamp_local", *keep],
+                         filters=[("Project_Name", "in", list(config.SITES)),
+                                  ("timestamp_local", ">=", start), ("timestamp_local", "<", end)])
+    df = df.dropna(axis="columns", how="all")
     log.info("generation: %s rows, %d power columns", f"{len(df):,}", len(keep))
     return df.rename(columns={"Project_Name": "site"})
 

@@ -244,3 +244,23 @@ local time, and the conversion is correct.
 - First full S3 run: 304.5 s, exit code 0. 27 files (40.6 MB) in the bucket: 7 raw, 13 processed, 7 manifests,
   with the same energy-balance totals as the local runs.
 - Correction: section 9 had listed 109 included days for Ekong Anaku; every pipeline log shows 108. Fixed.
+
+## 12. QuickSight dashboard
+
+- Four sheets: Overview, Trends, Anomalies, Accounting. Seven datasets, one per manifest, stored in SPICE.
+- **Ratios are computed from totals, not averaged.** Calculated fields `collected_vs_billed =
+  sum(collected_usd) / sum(billed_usd)`, `metered_share = sum(metered_kwh) / sum(load_kwh)` and
+  `pv_yield = sum(pv_kwh) / max(pv_kwp) / (sum(monitored_slots) / 96)`. Averaging the monthly ratios would
+  give a short month the same weight as a full one: for solar yield, it gives 3.15 / 0.83 / 1.57
+  instead of 3.19 / 0.84 / 1.60.
+- **Currencies are never added together.** Cross-site visuals use the `_usd` columns. In the accounting
+  pivot, `site` is the first row field, so subtotals stay in one currency, and the row grand total
+  (which would add NGN and KES) is hidden.
+- **One site selector for several datasets.** A QuickSight filter belongs to one dataset, so a parameter
+  `SelectedSite` drives one filter per dataset from a single dropdown.
+- The average-day chart uses small multiples with independent Y axes: Ekong Anaku's meters use 5–10x more
+  per hour than the Kenyan sites, and on one shared axis the Kenyan curves are flat.
+- Verified on screen: KPIs 3,771.24 kWh, USD 1,379.09 billed, USD 1,387.50 collected, 100.61%. Metered share
+  84.22 / 74.90 / 39.32%. Anomalies 8,841 / 1,429 / 1,551. These are the same as the pipeline output files.
+- Cost: the 30-day trial covers user fees and the $250/month account fee. The account must be closed
+  before the trial ends (cleanup checklist).

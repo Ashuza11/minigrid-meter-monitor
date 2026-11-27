@@ -138,6 +138,32 @@ same paths in the S3 bucket when `--local` is omitted.
 `sparkmeterreadings_clean_Ekong_Anaku.parquet`, `minigridprojects.parquet`, `tariffs.parquet`,
 `paymentconfirmations.parquet` and `vrmgeneration.parquet`.
 
+## Case study: a DR Congo microgrid
+
+[`notebooks/drc_idjwi_case_study.ipynb`](notebooks/drc_idjwi_case_study.ipynb) applies the same methods
+(data-quality measurement, 15-minute energy slots, and the anomaly rules from `anomalies.py`, unchanged)
+to 5-second electrical measurements from a micro-hydro microgrid on Idjwi Island, Lake Kivu (KIT dataset,
+35.6 days in January–February 2022). The site is an industrial campus run by PROLASA, not a commercial
+solar mini-grid.
+
+- **Unregulated frequency:** the site's load controller is broken. Only 13.4% of readings are within
+  49–51 Hz, the median is 63.5 Hz, and 28.3% of readings sit at the logger's 70 Hz cap.
+- **Under-voltage:** only 57–66% of 10-minute periods per phase are within ±10% of 230 V. Harmonic distortion
+  stays well within limits.
+- **Idle productive-use equipment:** the corn mill was energised 99.8% of the time but consumed nothing; the
+  metal workshop used 3.0 kWh in 36 days.
+- **The rules transfer:** NEGATIVE found 54 metering-fault events on the workshop meter. ZERO_RUN missed the
+  idle corn mill because frequent logger outages split its zeros, a limitation the notebook documents.
+
+```bash
+uv sync --group notebook
+uv run --group notebook jupyter lab notebooks/drc_idjwi_case_study.ipynb
+```
+
+Source files, from the [KIT dataset](https://doi.org/10.35097/1305), go in `data/source/kit/`:
+`drcongo_idjwi_main_distribution_v07.csv`, `drcongo_idjwi_corn_mill_v07.csv`,
+`drcongo_idjwi_metal_workshop_v07.csv` and `Symbols_Units_Explanations_v03.xlsx`.
+
 ## Repository layout
 
 ```
@@ -146,6 +172,7 @@ config.py              paths, analysis window, sites, thresholds
 storage.py             local / S3 read and write
 ingest.py clean.py anomalies.py aggregate.py generation.py manifest.py   pipeline steps
 tests/                 unit tests
+notebooks/             DR Congo case study (KIT micro-hydro data)
 reference/             official monthly USD exchange rates (Central Bank of Kenya, Central Bank of Nigeria)
 docs/                  decisions log, data and metrics guide, IAM policy, images
 ```
@@ -188,6 +215,6 @@ docs/                  decisions log, data and metrics guide, IAM policy, images
   licence.
 - **Exchange rates:** Central Bank of Kenya monthly averages and Central Bank of Nigeria daily central rates,
   averaged per month (sources listed in `reference/usd_exchange_rates_2024h1.csv`).
-- **KIT microgrid dataset** (planned DR Congo case study): Luh et al. (2022). *High-resolution real-world
+- **KIT microgrid dataset** (DR Congo case study): Luh et al. (2022). *High-resolution real-world
   electricity data from three microgrids in the global south*. KIT RADAR, https://doi.org/10.35097/1305.
   Licensed CC BY 4.0.

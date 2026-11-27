@@ -264,3 +264,31 @@ local time, and the conversion is correct.
   84.22 / 74.90 / 39.32%. Anomalies 8,841 / 1,429 / 1,551. These are the same as the pipeline output files.
 - Cost: the 30-day trial covers user fees and the $250/month account fee. The account must be closed
   before the trial ends (cleanup checklist).
+
+## 13. DR Congo case study (KIT data)
+
+- **Dataset and honesty about the site.** The KIT dataset's DRC site is an industrial campus at Kalenge, Idjwi
+  Island, run by PROLASA on about 20 kW of micro-hydro with diesel backup. It is labelled as such: it is not a
+  commercial solar mini-grid.
+- **Files.** Only the files needed were downloaded (about 466 MB of the 989 MB archive): the main distribution
+  station, two productive-use machines (corn mill, metal workshop) and the units file. They are stored
+  unchanged in `data/source/kit/` (git-ignored).
+- **Reuse, not rewrite.** The machine meters are converted to the pipeline's input format (15-minute slots,
+  `energy_kwh_observed`, a slot counts as measured with at least half of its 180 five-second readings) and
+  `anomalies.run_all_rules` runs unchanged, with the same thresholds and severities.
+- **Benchmarks.** EN 50160 limits are used as a reference, not as a requirement for this site: islanded
+  frequency 49–51 Hz for 95% of the time and 42.5–57.5 Hz always; 10-minute mean voltage within ±10% of
+  nominal for 95% of the time; voltage THD at most 8%. The nominal voltage is not documented, so 230 V and
+  220 V are both reported.
+- **Regulated 50 Hz periods.** A run of at least 10 minutes within 49.5–50.5 Hz. The publishers say diesel
+  operation shows as a stable 50 Hz, but load during these periods is lower than outside them, which does
+  not match "diesel for planned high loads". They are therefore reported as regulated periods, with the cause
+  left open.
+- **Data findings that changed the plan.** The corn mill consumed nothing in the whole period, and the metal
+  workshop has 6,245 negative readings. Below the 70 Hz cap, frequency and load show no simple relationship
+  (rank correlation 0.04), so the notebook does not claim one.
+- **Rule limitation found.** ZERO_RUN did not flag the idle corn mill: 1,177 empty slots from logger outages
+  split its zeros into stretches of at most 2.24 days. The rule was not changed. The notebook reports the
+  share of measured slots at zero (100%) as a complementary check.
+- **Notebook tools** (`jupyter`, `matplotlib`) are in a separate `notebook` dependency group, so the pipeline's
+  own dependencies are unchanged.

@@ -78,9 +78,9 @@ Added because the new dataset supports them and they are standard mini-grid KPIs
 - **ARPU** (average revenue per user per month) and **kWh per customer per month**.
 - **Hourly load profile in local time** per site (Trends sheet).
 - **Observed vs reconstructed share** per meter and site (data-quality report).
-- ~~Energy sold per kWp of installed PV~~: **replaced by PV yield per kWp** (solar energy produced per kW of
-  panels per day) from `vrmgeneration`. The sample holds 50 meters per site, not every customer, so
-  "sample kWh / site kWp" would understate the real figure. See section 9.
+- **PV yield per kWp**: solar energy produced per kW of panels per day, from `vrmgeneration`. It replaces the
+  originally planned "energy sold per kWp of installed PV": the sample holds 50 meters per site, not every
+  customer, so "sample kWh / site kWp" would understate the real figure. See section 9.
 
 Added after downloading `paymentconfirmations`, `sparkmetertransactions` and `vrmgeneration` (2026-11-20):
 - **Billed vs collected**: estimated billed revenue (kWh × tariff) compared with payments actually received, per site and month.
@@ -91,7 +91,7 @@ Added after downloading `paymentconfirmations`, `sparkmetertransactions` and `vr
 
 ## 6. Open items
 
-- ~~Which `vrmgeneration` columns give PV energy~~: decided, section 9.
+- Resolved: the `vrmgeneration` columns used for PV energy are defined in section 9.
 - Lorengelup meters only 39% of the energy its system delivers (section 9). The cause can't be determined
   from the data; it needs a site visit or the operator's network records.
 - Payments cover mobile money only, so "billed vs collected" may understate collections (cash top-ups unknown).

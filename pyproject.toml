@@ -15,3 +15,7 @@ dependencies = [
 dev = [
     "pytest>=9.2.0",
 ]
+notebook = [
+    "jupyter>=1.1.1",
+    "matplotlib>=3.11.2",
+]
